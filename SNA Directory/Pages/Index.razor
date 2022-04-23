@@ -1,0 +1,247 @@
+﻿@page "/"
+@inject ISNAData snaData
+@inject NavigationManager navManager
+@inject ProtectedSessionStorage sessionStorage
+@inject IJSRuntime JS
+
+<PageTitle>Mn SNAs</PageTitle>
+<div>
+    <h1 class="page-heading mb-4">Minnesota's Scientific and Natural Areas</h1>
+    <div class="row nav-links">
+        <div class="col-md-4 py-2">
+            <button class="btn btn-filter @FilterByBiomeClass(true)" @onclick="(()=> FilterByBiome(true))">Biomes</button>
+            <button class="btn btn-filter @FilterByBiomeClass(false)" @onclick="(()=> FilterByBiome(false))">Landscapes</button>
+        </div>
+        <div class="col-md-4 py-2">
+            <input type="text" placeholder="Search" aria-label="Seach Box" class="form-control rounded-control" @oninput="((txt) => OnSearchInput((string)txt.Value))" />
+        </div>
+    </div>
+    <div class="lists row ">
+        <div class="arealist col-md-4 px-4 m-4 ">
+            <div class=sna-entry>
+                @if (snas is not null)
+                {
+                    <Virtualize Items="@snas" Context="s" OverscanCount="8">
+                        <div class="selection-list-item text-nowrap" @onclick="(()=>OpenDetails(s))">@s.Name</div>
+                    </Virtualize>
+                }
+            </div>
+        </div>
+        <div class="filter col-md-4 px-4 m-4">
+            <div>
+                <div class="@BiomeFilterListClass(true)">
+                    @if (biomes is not null)
+                    {
+                        <h3>Biome</h3>
+                        <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
+                        @foreach (var b in biomes)
+                        {
+                            <div class="selection-list-item @IsSelected(b.Name)" @onclick="(()=>OnSelectorClick(b.Name))">@b.Name</div>
+                        }
+                    }
+                </div>
+                <div class="@BiomeFilterListClass(false)">
+                    @if (landscapes is not null)
+                    {
+                        <h3>Landscape</h3>
+                        <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
+                        @foreach (var l in landscapes)
+                        {
+                            <div class="selection-list-item @IsSelected(l)" @onclick="(()=>OnSelectorClick(l))">@l</div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ack-row row">
+
+        <div class="acknowlegement col-10">
+            <p>
+                This site is based on the Minnesota DNR Scientific and Natural Areas site and is licensed under the
+                <a href="https://www.dnr.state.mn.us/sitetools/data_software_license.html">
+                    Minnesota DNR General Data & Software License Agreement
+                </a>
+                . All images copyright Minnesota DNR.
+            </p>
+        </div>
+
+    </div>
+</div>
+
+
+@code {
+    private List<SNAModel> allsnas;
+    private List<SNAModel> snas;
+    private List<Biome> biomes;
+    private List<string> landscapes;
+
+
+    private string selectedBiome = "All";
+    private string selectedLandscape = "All";
+    private string selectedBackgroundUrl = "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg";
+
+    private string searchText = "";
+    private bool isFilteredByBiome = true;
+
+    protected async override Task OnInitializedAsync()
+    {
+        allsnas = await snaData.GetAllSNAsAsync();
+        if (allsnas is null) navManager.NavigateTo("/NoDatabase");
+        biomes = await snaData.GetAllBiomesAsync();
+        landscapes = biomes.SelectMany(biome => biome.Landscapes).OrderBy(s => s).ToList();
+
+    }
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadFilterState();
+            await SetBackground(true);
+            await FilterSnas();
+            StateHasChanged();
+        }
+
+    }
+
+    private async Task LoadFilterState()
+    {
+        var stringResults = await sessionStorage.GetAsync<string>(nameof(selectedBiome));
+        selectedBiome = stringResults.Success ? stringResults.Value : "All";
+
+        stringResults = await sessionStorage.GetAsync<string>(nameof(selectedLandscape));
+        selectedLandscape = stringResults.Success ? stringResults.Value : "All";
+
+        stringResults = await sessionStorage.GetAsync<string>(nameof(searchText));
+        searchText = stringResults.Success ? stringResults.Value : "";
+
+        var boolResults = await sessionStorage.GetAsync<bool>(nameof(isFilteredByBiome));
+        isFilteredByBiome = boolResults.Success ? boolResults.Value : true;
+
+    }
+
+    private async Task SaveFilterState()
+    {
+        await sessionStorage.SetAsync(nameof(selectedBiome), selectedBiome);
+        await sessionStorage.SetAsync(nameof(selectedLandscape), selectedLandscape);
+        await sessionStorage.SetAsync(nameof(searchText), searchText);
+        await sessionStorage.SetAsync(nameof(isFilteredByBiome), isFilteredByBiome);
+
+    }
+
+    private async Task FilterSnas()
+    {
+        snas = allsnas;
+
+        if (isFilteredByBiome)
+        {
+            if (selectedBiome != "All")
+            {
+                snas = snas.Where(s => s.Biome == selectedBiome).ToList();
+            }
+        }
+        else
+        {
+            if (selectedLandscape != "All")
+            {
+                snas = snas.Where(s => s.Landscape == selectedLandscape).ToList();
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(searchText) == false)
+        {
+            snas = snas.Where(s => s.Name.Contains(searchText, StringComparison.InvariantCultureIgnoreCase)).ToList();
+        }
+
+        await SaveFilterState();
+    }
+
+    private async Task FilterByBiome(bool isBiome)
+    {
+        isFilteredByBiome = isBiome;
+        await FilterSnas();
+    }
+
+    private async Task OnSearchInput(string searchInput)
+    {
+        searchText = searchInput;
+        await FilterSnas();
+    }
+
+    private async Task OnSelectorClick(string selector = "All")
+    {
+        if (isFilteredByBiome)
+        {
+            selectedBiome = selector;
+        }
+        else
+        {
+            selectedLandscape = selector;
+        }
+        await SetBackground();
+        await FilterSnas();
+    }
+
+    private string IsSelected(string item)
+    {
+        if(isFilteredByBiome)
+        {
+            if (selectedBiome == item) return "item-selected";
+        }
+        else
+        {
+            if (selectedLandscape == item) return "item-selected";
+        }
+        return string.Empty;
+    }
+
+    private async Task SetBackground(bool force =false)
+    {
+        string? backgroundUrl;
+        if (isFilteredByBiome)
+        {
+            backgroundUrl = biomes.Where(b => b.Name == selectedBiome).FirstOrDefault()?.Url;
+        }
+        else
+        {
+            backgroundUrl = biomes.Where(b => b.Landscapes.Contains(selectedLandscape)).FirstOrDefault()?.Url;
+        }
+
+        if (string.IsNullOrWhiteSpace(backgroundUrl))
+        {
+            backgroundUrl = "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg";
+        }
+
+        if ((selectedBackgroundUrl != backgroundUrl) || force)
+        {
+            await JS.InvokeVoidAsync("setBackgroundUrl", backgroundUrl);
+            selectedBackgroundUrl = backgroundUrl;
+        }
+    }
+    private string FilterByBiomeClass(bool isByBiome)
+    {
+        string css = string.Empty;
+        if (isByBiome == isFilteredByBiome)
+        {
+            css = "filter-selected";
+        }
+        return css;
+    }
+
+    private string BiomeFilterListClass(bool isBiome)
+    {
+        string css = string.Empty;
+        if (isBiome != isFilteredByBiome)
+        {
+            css = "list-hidden";
+        }
+        return css;
+    }
+
+
+    private void OpenDetails(SNAModel sna)
+    {
+        navManager.NavigateTo($"/Details/{sna.Id}");
+    }
+}

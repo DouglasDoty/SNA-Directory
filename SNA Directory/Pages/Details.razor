@@ -1,0 +1,136 @@
+﻿@page "/Details/{Id}"
+@inject ISNAData snaData
+@inject IJSRuntime JS
+@inject NavigationManager navManager
+<div class="d-flex justify-content-end">
+    <span class=" oi oi-x" @onclick="(()=>ClosePage())"></span>
+</div>
+
+
+@if (_sna is not null)
+{
+    <div>
+        <div class="row p-2">
+            <div class="col-1">
+                <img src="@GetSNAMap()" height="55">
+            </div>
+            <h2 class="col-11 col-md-8">SNA Name: @_sna.Name</h2>
+
+
+
+        </div>
+        <div>Biome(Province): @_sna.Biome</div>
+
+        <div>Landscape: @_sna.Landscape</div>
+        <div class="row image-buttons">
+            <div class="col-4 p-0">
+                <button class="btn btn-image" @onclick="(()=> IncrementImage(false) )">Previous</button>
+            </div>
+            <div class="next-image col-4 px-0">
+                <button class="btn btn-image" @onclick="(()=> IncrementImage(true) )">Next</button>
+            </div>
+            <div class="add-comment col-4 px-4">
+                <button class="btn btn-image " @onclick="(()=> NewComment())">Add a comment</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-8 p-0">
+                <img class="d-block w-100" src="@GetImage()" alt="loading..." >
+            </div>
+            <div class="col-4">
+                @if (_comments?.Count > 0)
+                {
+                    @foreach (CommentModel comment in _comments)
+                    {
+                        <div class="sna-comment p-2 m-2">
+                            <span>
+                                @comment.Name
+                            </span>
+                            <span>said at</span>
+                            <span>
+                                @comment.Date.ToLocalTime().ToString("HH:mm on MMM dd yyy"):
+                            </span>
+                            <div class="comment-body">
+                                @comment.Text
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; }
+    private int _imageIndex = 0;
+
+    private SNAModel _sna;
+    private List<CommentModel> _comments;
+
+    protected async override Task OnInitializedAsync()
+    {
+        _sna = await snaData.GetSnaAsync(Id);
+        _comments = await snaData.GetComments(_sna.DNRId);
+    }
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("setBackgroundUrl", "../images/LgtGreen.png");
+        }
+    }
+
+
+    private string GetSNAMap()
+    {
+        var result = $"https://maps1.dnr.state.mn.us/cgi-bin/locator.cgi?id=sna{_sna.DNRId.ToString("00000")}&type=sna&style=wolf";
+        return result;
+    }
+
+    private string GetImage()
+    {
+        string url;
+        if (_imageIndex == 0)
+        {
+            url = GetSNABanner();
+        }
+        else
+        {
+            url = GetSnaImage(_imageIndex);
+        }
+        return url;
+    }
+
+    private void IncrementImage(bool up)
+    {
+        _imageIndex = up ? _imageIndex + 1 : _imageIndex - 1;
+        if (_imageIndex < 0) _imageIndex = 6;
+        if (_imageIndex > 6) _imageIndex = 0;
+        //StateHasChanged();
+    }
+
+    private string GetSNABanner()
+    {
+        return $"https://images.dnr.state.mn.us/destinations/snas/slides/banners/sna{_sna.DNRId.ToString("00000")}_banner.jpg";
+    }
+
+    private string GetSnaImage(int i = 1)
+    {
+        return $"https://images.dnr.state.mn.us/destinations/snas/slides/sna{_sna.DNRId.ToString("00000")}_{i.ToString("0")}.jpg";
+    }
+
+    private void NewComment()
+    {
+        navManager.NavigateTo($"./comment/{_sna.DNRId.ToString()}");
+    }
+
+
+    private async void ClosePage()
+    {
+        await JS.InvokeVoidAsync("setBackgroundUrl", "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg");
+        navManager.NavigateTo("/");
+    }
+}
