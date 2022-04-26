@@ -160,6 +160,7 @@
     private async Task FilterByBiome(bool isBiome)
     {
         isFilteredByBiome = isBiome;
+        await SetBackground();
         await FilterSnas();
     }
 
@@ -185,7 +186,7 @@
 
     private string IsSelected(string item)
     {
-        if(isFilteredByBiome)
+        if (isFilteredByBiome)
         {
             if (selectedBiome == item) return "item-selected";
         }
@@ -196,7 +197,7 @@
         return string.Empty;
     }
 
-    private async Task SetBackground(bool force =false)
+    private async Task SetBackground(bool force = false)
     {
         string? backgroundUrl;
         if (isFilteredByBiome)
