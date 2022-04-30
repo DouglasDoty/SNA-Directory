@@ -77,7 +77,7 @@ public class SNAData : ISNAData
     {
         if (DatabaseInvalid) return null;
         var results = await _Comments.FindAsync(c => c.DnrId == snaId);
-        return results.ToList();
+        return results.ToList().OrderByDescending(c => c.Date).ToList();
     }
 
     public Task CreateComment(CommentModel comment)
