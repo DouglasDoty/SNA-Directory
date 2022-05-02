@@ -33,6 +33,14 @@
         window.setBackgroundUrl = (url)=>{
             document.body.style.backgroundImage = `url('${url}')`;
         };
+        window.popModal = (id)=>{
+            var myModal = new bootstrap.Modal(document.getElementById(id),{backdrop:'static'});
+            myModal.show();
+        };
+        window.closeModal = (id)=>{
+            var myModal = bootstrap.Modal.getInstance(document.getElementById(id));
+            myModal.hide();
+        };
      </script>
 </body>
 </html>
