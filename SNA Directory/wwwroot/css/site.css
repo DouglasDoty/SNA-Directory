@@ -195,3 +195,24 @@ a, .btn-link {
     overflow-wrap: anywhere;
 }
 
+.new-comment {
+    background-color: #FFFFFF;
+    border: solid;
+    border-width: 1px;
+    height:4rem
+    ;
+}
+
+.new-comment-text {
+    font-style: italic;
+    resize: none;
+}
+
+.new-comment-text:focus{
+    border:none;
+    box-shadow:none;
+}
+
+.hidden-text {
+    display:none;
+}

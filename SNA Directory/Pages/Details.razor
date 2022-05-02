@@ -6,6 +6,34 @@
     <span class=" oi oi-x" @onclick="(()=>ClosePage())"></span>
 </div>
 
+<!-- Modal -->
+<div class="modal fade" id="saveCommentModal" tabindex="-1" aria-labelledby="saveCommentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveCommentModalLabel">Save Comment?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <EditForm Model=@commentModel OnValidSubmit="@HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="modal-body">
+                    <div class="name-section mb-4">
+                        <label class="form-label " for="name">Your name</label>
+                        <InputText class="form-control" id="name" @bind-Value="commentModel.Name" />
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="(()=>commentText.Element.Value.FocusAsync())" data-bs-dismiss="modal">Edit More</button>
+                    <button type="button" class="btn btn-secondary" @onclick="(()=>DiscardComment())" data-bs-dismiss="modal">Discard Comment</button>
+                    <button type="submit" class="btn btn-primary">Save Comment</button>
+                </div>
+            </EditForm>
+
+        </div>
+    </div>
+</div>
 
 @if (_sna is not null)
 {
@@ -48,10 +76,19 @@
                 </button>
 
             </div>
- 
+
             <div class="col-4">
-                 <button class="btn btn-image m-4 " @onclick="(()=> NewComment())">Add a comment</button>
-               @if (_comments?.Count > 0)
+                <div  class=" new-comment p-0 mx-2">
+                <EditForm Model=@commentModel>
+                    <InputTextArea placeholder="Add a comment"
+                               class="form-control new-comment-text"
+                               @ref="commentText"
+                               @onkeypress="((el)=>OnKeyPress(el))"
+                               @bind-Value="commentModel.Text">
+                    </InputTextArea>
+                </EditForm>
+                </div>
+                @if (_comments?.Count > 0)
                 {
                     @foreach (CommentModel comment in _comments)
                     {
@@ -82,6 +119,8 @@
 
     private SNAModel _sna;
     private List<CommentModel> _comments;
+    private CommentModel commentModel = new();
+    private InputTextArea commentText;
 
     protected async override Task OnInitializedAsync()
     {
@@ -116,6 +155,36 @@
     private void NewComment()
     {
         navManager.NavigateTo($"./comment/{_sna.DNRId.ToString()}");
+    }
+
+    private async void SaveComment()
+    {
+        await JS.InvokeVoidAsync("popModal", "saveCommentModal");
+    }
+
+    private void OnKeyPress(KeyboardEventArgs el)
+    {
+        if (el.Key == "Enter")
+        {
+            SaveComment();
+        }
+    }
+
+    private void DiscardComment()
+    {
+        commentModel = new();
+        commentText.Element.Value.FocusAsync();
+    }
+
+    private async void HandleValidSubmit()
+    {
+        await JS.InvokeVoidAsync("closeModal", "saveCommentModal");
+        commentModel.DnrId = _sna.DNRId;
+        commentModel.Date = DateTime.UtcNow;
+        await snaData.CreateComment(commentModel);
+        commentModel = new();
+        _comments = await snaData.GetComments(_sna.DNRId);
+         StateHasChanged();
     }
 
 
