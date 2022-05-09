@@ -7,9 +7,9 @@ public class Biome
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; }
-    public string Name { get; set; }
-    public string Url { get; set; }
-    public List<string> Landscapes { get; set; }  
+    public string Id { get; set; } = string.Empty;  
+    public string Name { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public List<string> Landscapes { get; set; } = new();  
 
 }

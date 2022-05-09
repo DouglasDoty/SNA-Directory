@@ -1,4 +1,5 @@
 ﻿@page "/Details/{Id}"
+@using System.Diagnostics
 @inject ISNAData snaData
 @inject IJSRuntime JS
 @inject NavigationManager navManager
@@ -6,34 +7,6 @@
     <span class=" oi oi-x" @onclick="(()=>ClosePage())"></span>
 </div>
 
-<!-- Modal -->
-<div class="modal fade" id="saveCommentModal" tabindex="-1" aria-labelledby="saveCommentModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="saveCommentModalLabel">Save Comment?</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <EditForm Model=@commentModel OnValidSubmit="@HandleValidSubmit">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <div class="modal-body">
-                    <div class="name-section mb-4">
-                        <label class="form-label " for="name">Your name</label>
-                        <InputText class="form-control" id="name" @bind-Value="commentModel.Name" />
-                    </div>
-
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="(()=>commentText.Element.Value.FocusAsync())" data-bs-dismiss="modal">Edit More</button>
-                    <button type="button" class="btn btn-secondary" @onclick="(()=>DiscardComment())" data-bs-dismiss="modal">Discard Comment</button>
-                    <button type="submit" class="btn btn-primary">Save Comment</button>
-                </div>
-            </EditForm>
-
-        </div>
-    </div>
-</div>
 
 @if (_sna is not null)
 {
@@ -78,15 +51,42 @@
             </div>
 
             <div class="col-4">
-                <div  class=" new-comment p-0 mx-2">
-                <EditForm Model=@commentModel>
-                    <InputTextArea placeholder="Add a comment"
-                               class="form-control new-comment-text"
-                               @ref="commentText"
-                               @onkeypress="((el)=>OnKeyPress(el))"
-                               @bind-Value="commentModel.Text">
-                    </InputTextArea>
-                </EditForm>
+                <div class=" new-comment p-0 mx-2">
+                    <EditForm EditContext="@editContext" OnValidSubmit="@HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <InputTextArea placeholder="Add a comment"
+                                   class="form-control new-comment-text"
+                                   @ref="commentText"
+                                   @onkeypress="((el)=>OnKeyPress(el))"
+                                   @onfocusout="((el)=>OnLoseFocus(el))"
+                                   @bind-Value="commentModel.Text">
+                        </InputTextArea>
+                        <!-- Modal -->
+                    <div class="modal fade" id="saveCommentModal" tabindex="-1" aria-labelledby="saveCommentModalLabel" aria-hidden="true">
+                            <div class="modal-dialog" @onfocusin="(()=>OnModalFocus())">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="saveCommentModalLabel">Save Comment?</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" @onclick="(()=>NewModel())" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <ValidationSummary />
+                                        <div class="name-section mb-4">
+                                            <label class="form-label " for="name">Your name</label>
+                                            <InputText class="form-control" id="name" @bind-Value="commentModel.Name" />
+                                        </div>
+
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" @onclick="(()=>RefocusCommentText())" data-bs-dismiss="modal">Edit More</button>
+                                        <button type="button" class="btn btn-secondary" @onclick="(()=>NewModel())" data-bs-dismiss="modal">Discard Comment</button>
+                                        <button type="submit" class="btn btn-primary" data-bs-dismiss="@CanCloseModal()">Save Comment</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </EditForm>
                 </div>
                 @if (_comments?.Count > 0)
                 {
@@ -114,16 +114,20 @@
 
 @code {
     [Parameter]
-    public string Id { get; set; }
-    private int _imageIndex = 0;
+    public string Id { get; set; } = string.Empty;
 
-    private SNAModel _sna;
-    private List<CommentModel> _comments;
+    private SNAModel _sna = new(){DNRId = 0};
+    private List<CommentModel>? _comments;
     private CommentModel commentModel = new();
-    private InputTextArea commentText;
+    private InputTextArea? commentText;
+    private EditContext? editContext;
+    private FieldIdentifier _commentTextIdentifier;
+    private bool _popingModal = false;
 
     protected async override Task OnInitializedAsync()
     {
+        editContext = new(commentModel);
+        _commentTextIdentifier = new(commentModel, "Text");
         _sna = await snaData.GetSnaAsync(Id);
         _comments = await snaData.GetComments(_sna.DNRId);
     }
@@ -157,36 +161,68 @@
         navManager.NavigateTo($"./comment/{_sna.DNRId.ToString()}");
     }
 
-    private async void SaveComment()
+    private async Task PopSaveDialog()
     {
+        _popingModal = true;
         await JS.InvokeVoidAsync("popModal", "saveCommentModal");
     }
 
-    private void OnKeyPress(KeyboardEventArgs el)
+    private void OnModalFocus()
     {
-        if (el.Key == "Enter")
+        _popingModal = false;
+    }
+
+    private async Task OnLoseFocus(object el)
+    {
+        if ((!_popingModal) && (editContext?.IsModified() ?? false))
         {
-            SaveComment();
+            await PopSaveDialog();
         }
     }
 
-    private void DiscardComment()
+    private async void OnKeyPress(KeyboardEventArgs el)
     {
-        commentModel = new();
-        commentText.Element.Value.FocusAsync();
+        if (el.Key == "Enter")
+        {
+            await PopSaveDialog();
+        }
     }
 
-    private async void HandleValidSubmit()
+    private async Task RefocusCommentText()
     {
-        await JS.InvokeVoidAsync("closeModal", "saveCommentModal");
+        if (commentText?.Element is not null)
+        {
+            await commentText.Element.Value.FocusAsync();
+        }
+    }
+
+    private void NewModel()
+    {
+        commentModel = new();
+        editContext = new(commentModel);
+        StateHasChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
         commentModel.DnrId = _sna.DNRId;
         commentModel.Date = DateTime.UtcNow;
         await snaData.CreateComment(commentModel);
-        commentModel = new();
         _comments = await snaData.GetComments(_sna.DNRId);
-         StateHasChanged();
+
+        await JS.InvokeVoidAsync("closeModal", "saveCommentModal");
+        NewModel();
     }
 
+    private string CanCloseModal()
+    {
+        ////Validation happens too late to use attributes to close the modal
+        //if(editContext?.GetValidationMessages().Count() == 0)
+        //{
+        //    return "modal";
+        //}
+        return string.Empty;
+    }
 
     private async void ClosePage()
     {

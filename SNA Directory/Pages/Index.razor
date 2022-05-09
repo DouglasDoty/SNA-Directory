@@ -13,7 +13,7 @@
             <button class="btn btn-filter @FilterByBiomeClass(false)" @onclick="(()=> FilterByBiome(false))">Landscapes</button>
         </div>
         <div class="col-md-4 py-2">
-            <input type="text" placeholder="Search" aria-label="Seach Box" class="form-control rounded-control" @oninput="((txt) => OnSearchInput((string)txt.Value))" />
+            <input type="text" placeholder="Search" aria-label="Seach Box" class="form-control rounded-control" @oninput="((txt) => OnSearchInput(txt.Value??string.Empty))" />
         </div>
     </div>
     <div class="lists row ">
@@ -71,10 +71,10 @@
 
 
 @code {
-    private List<SNAModel> allsnas;
-    private List<SNAModel> snas;
-    private List<Biome> biomes;
-    private List<string> landscapes;
+    private List<SNAModel> allsnas = new();
+    private List<SNAModel> snas = new();
+    private List<Biome> biomes = new();
+    private List<string> landscapes = new();
 
 
     private string selectedBiome = "All";
@@ -108,13 +108,13 @@
     private async Task LoadFilterState()
     {
         var stringResults = await sessionStorage.GetAsync<string>(nameof(selectedBiome));
-        selectedBiome = stringResults.Success ? stringResults.Value : "All";
+        selectedBiome = (stringResults.Success ? stringResults.Value : "All") ?? string.Empty;
 
         stringResults = await sessionStorage.GetAsync<string>(nameof(selectedLandscape));
-        selectedLandscape = stringResults.Success ? stringResults.Value : "All";
+        selectedLandscape = (stringResults.Success ? stringResults.Value : "All") ?? string.Empty;
 
         stringResults = await sessionStorage.GetAsync<string>(nameof(searchText));
-        searchText = stringResults.Success ? stringResults.Value : "";
+        searchText = (stringResults.Success ? stringResults.Value : string.Empty) ?? string.Empty;
 
         var boolResults = await sessionStorage.GetAsync<bool>(nameof(isFilteredByBiome));
         isFilteredByBiome = boolResults.Success ? boolResults.Value : true;
@@ -164,9 +164,9 @@
         await FilterSnas();
     }
 
-    private async Task OnSearchInput(string searchInput)
+    private async Task OnSearchInput(object searchInput)
     {
-        searchText = searchInput;
+        searchText = searchInput as string ?? string.Empty;
         await FilterSnas();
     }
 

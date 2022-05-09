@@ -216,3 +216,7 @@ a, .btn-link {
 .hidden-text {
     display:none;
 }
+
+.slide {
+    height:fit-content;
+}

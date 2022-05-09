@@ -33,11 +33,11 @@
 
 @code {
     [Parameter]
-    public string Id { get; set; }
+    public string Id { get; set; } = string.Empty;
 
-    private EditContext? editContext;
+    //private EditContext? editContext;
     private CommentModel commentModel = new();
-    private int _textLength = 0;
+    //private int _textLength = 0;
 
 
     //protected override void OnInitialized()
