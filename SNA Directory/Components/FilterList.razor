@@ -1,0 +1,88 @@
+﻿@inject IBiomeData biomeData
+
+
+<div>
+    <div class="@BiomeFilterListClass(true)">
+        @if (biomes is not null)
+        {
+            <h3>Biome</h3>
+            <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
+            @foreach (var b in biomes)
+            {
+                <div class="selection-list-item @IsSelected(b.Name)" @onclick="(()=>OnSelectorClick(b.Name))">@b.Name</div>
+            }
+        }
+    </div>
+    <div class="@BiomeFilterListClass(false)">
+        @if (landscapes is not null)
+        {
+            <h3>Landscape</h3>
+            <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
+            @foreach (var l in landscapes)
+            {
+                <div class="selection-list-item @IsSelected(l)" @onclick="(()=>OnSelectorClick(l))">@l</div>
+            }
+        }
+    </div>
+</div>
+
+
+@code {
+    [Parameter, EditorRequired]
+    public bool isFilteredByBiome { get; set; }
+    [Parameter]
+    public string SelectedBiome { get; set; } = "All";
+    [Parameter]
+    public EventCallback<(string,string)> SelectedBiomeChanged { get; set; }
+    [Parameter]
+    public string SelectedLandscape { get; set; } = "All";
+    [Parameter]
+    public EventCallback<(string,string)> SelectedLandscapeChanged { get; set; }
+
+    private List<Biome> biomes = new();
+    private List<string> landscapes = new();
+    private const string _defaultBackground = "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg";
+
+    protected async override Task OnInitializedAsync()
+    {
+        biomes = await biomeData.GetAllBiomesAsync();
+        landscapes = biomes.SelectMany(biome => biome.Landscapes).OrderBy(s => s).ToList();
+    }
+
+     private string IsSelected(string item)
+    {
+        if (isFilteredByBiome)
+        {
+            if (SelectedBiome == item) return "item-selected";
+        }
+        else
+        {
+            if (SelectedLandscape == item) return "item-selected";
+        }
+        return string.Empty;
+    }
+
+    private async Task OnSelectorClick(string selector = "All")
+    {
+        if (isFilteredByBiome)
+        {
+            SelectedBiome = selector;
+            await SelectedBiomeChanged.InvokeAsync((selector,biomes.Where(b => b.Name == SelectedBiome).FirstOrDefault()?.Url ?? _defaultBackground));
+        }
+        else
+        {
+            SelectedLandscape = selector;
+            await SelectedLandscapeChanged.InvokeAsync(( selector, biomes.Where(b => b.Landscapes.Contains(SelectedLandscape)).FirstOrDefault()?.Url ?? _defaultBackground));
+        }
+    }
+
+    private string BiomeFilterListClass(bool isBiome)
+    {
+        string css = string.Empty;
+        if (isBiome != isFilteredByBiome)
+        {
+            css = "list-hidden";
+        }
+        return css;
+    }
+}

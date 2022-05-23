@@ -1,10 +1,10 @@
 ﻿@page "/"
-@inject ISNAData snaData
-@inject NavigationManager navManager
+@using SNA_Directory.Components
+@using System.Diagnostics
 @inject ProtectedSessionStorage sessionStorage
 @inject IJSRuntime JS
 
-<PageTitle>Mn SNAs</PageTitle>
+<PageTitle>Mn Scientific and Natural Areas</PageTitle>
 <div>
     <h1 class="page-heading mb-4">Minnesota's Scientific and Natural Areas</h1>
     <div class="row nav-links">
@@ -13,45 +13,19 @@
             <button class="btn btn-filter @FilterByBiomeClass(false)" @onclick="(()=> FilterByBiome(false))">Landscapes</button>
         </div>
         <div class="col-md-4 py-2">
-            <input type="text" placeholder="Search" aria-label="Seach Box" class="form-control rounded-control" @oninput="((txt) => OnSearchInput(txt.Value??string.Empty))" />
+            <input type="text" placeholder="Search" aria-label="Search Box" class="form-control rounded-control" @oninput="((txt) => OnSearchInput(txt.Value??string.Empty))" />
         </div>
     </div>
     <div class="lists row ">
         <div class="arealist col-md-4 px-4 m-4 ">
-            <div class=sna-entry>
-                @if (snas is not null)
-                {
-                    <Virtualize Items="@snas" Context="s" OverscanCount="8">
-                        <div class="selection-list-item text-nowrap" @onclick="(()=>OpenDetails(s))">@s.Name</div>
-                    </Virtualize>
-                }
-            </div>
+            <AreaList @ref="areaListComponent" />
         </div>
         <div class="filter col-md-4 px-4 m-4">
-            <div>
-                <div class="@BiomeFilterListClass(true)">
-                    @if (biomes is not null)
-                    {
-                        <h3>Biome</h3>
-                        <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
-                        @foreach (var b in biomes)
-                        {
-                            <div class="selection-list-item @IsSelected(b.Name)" @onclick="(()=>OnSelectorClick(b.Name))">@b.Name</div>
-                        }
-                    }
-                </div>
-                <div class="@BiomeFilterListClass(false)">
-                    @if (landscapes is not null)
-                    {
-                        <h3>Landscape</h3>
-                        <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
-                        @foreach (var l in landscapes)
-                        {
-                            <div class="selection-list-item @IsSelected(l)" @onclick="(()=>OnSelectorClick(l))">@l</div>
-                        }
-                    }
-                </div>
-            </div>
+            <FilterList isFilteredByBiome="@isFilteredByBiome"
+                        SelectedBiome="@selectedBiome"
+                        SelectedBiomeChanged="@HandleBiomeChanged"
+                        SelectedLandscape="@selectedLandscape"
+                        SelectedLandscapeChanged="@HandleLandscapeChanged" />
         </div>
     </div>
     <div class="ack-row row">
@@ -71,38 +45,28 @@
 
 
 @code {
-    private List<SNAModel> allsnas = new();
-    private List<SNAModel> snas = new();
-    private List<Biome> biomes = new();
-    private List<string> landscapes = new();
-
 
     private string selectedBiome = "All";
     private string selectedLandscape = "All";
-    private string selectedBackgroundUrl = "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg";
+
+    private bool isFilteredByBiome = true;
+    private string selectedBackgroundUrl = string.Empty;
+    private string biomeBackgroundUrl = _defaultBackground;
+    private string landscapeBackgroundUrl = _defaultBackground;
+    private const string _defaultBackground = "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg";
+    private AreaList? areaListComponent;
 
     private string searchText = "";
-    private bool isFilteredByBiome = true;
 
-    protected async override Task OnInitializedAsync()
-    {
-        allsnas = await snaData.GetAllSNAsAsync();
-        if (allsnas is null) navManager.NavigateTo("/NoDatabase");
-        biomes = await snaData.GetAllBiomesAsync();
-        landscapes = biomes.SelectMany(biome => biome.Landscapes).OrderBy(s => s).ToList();
-
-    }
 
     protected async override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await LoadFilterState();
-            await SetBackground(true);
-            await FilterSnas();
+            await FilterAreas();
             StateHasChanged();
         }
-
     }
 
     private async Task LoadFilterState()
@@ -113,108 +77,62 @@
         stringResults = await sessionStorage.GetAsync<string>(nameof(selectedLandscape));
         selectedLandscape = (stringResults.Success ? stringResults.Value : "All") ?? string.Empty;
 
-        stringResults = await sessionStorage.GetAsync<string>(nameof(searchText));
-        searchText = (stringResults.Success ? stringResults.Value : string.Empty) ?? string.Empty;
-
         var boolResults = await sessionStorage.GetAsync<bool>(nameof(isFilteredByBiome));
         isFilteredByBiome = boolResults.Success ? boolResults.Value : true;
 
+        stringResults = await sessionStorage.GetAsync<string>(nameof(biomeBackgroundUrl));
+        biomeBackgroundUrl = (stringResults.Success ? stringResults.Value : _defaultBackground) ?? _defaultBackground;
+        stringResults = await sessionStorage.GetAsync<string>(nameof(landscapeBackgroundUrl));
+        landscapeBackgroundUrl = (stringResults.Success ? stringResults.Value : _defaultBackground) ?? _defaultBackground;
+        Debug.WriteLine($"Filter loaded: isBiome={isFilteredByBiome}, Biome={selectedBiome}, Landscape={selectedLandscape}, SearchText=[{searchText}]");
     }
 
     private async Task SaveFilterState()
     {
         await sessionStorage.SetAsync(nameof(selectedBiome), selectedBiome);
         await sessionStorage.SetAsync(nameof(selectedLandscape), selectedLandscape);
-        await sessionStorage.SetAsync(nameof(searchText), searchText);
         await sessionStorage.SetAsync(nameof(isFilteredByBiome), isFilteredByBiome);
-
+        await sessionStorage.SetAsync(nameof(biomeBackgroundUrl), biomeBackgroundUrl);
+        await sessionStorage.SetAsync(nameof(landscapeBackgroundUrl), landscapeBackgroundUrl);
     }
 
-    private async Task FilterSnas()
+    private async Task FilterAreas()
     {
-        snas = allsnas;
-
-        if (isFilteredByBiome)
-        {
-            if (selectedBiome != "All")
-            {
-                snas = snas.Where(s => s.Biome == selectedBiome).ToList();
-            }
-        }
-        else
-        {
-            if (selectedLandscape != "All")
-            {
-                snas = snas.Where(s => s.Landscape == selectedLandscape).ToList();
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(searchText) == false)
-        {
-            snas = snas.Where(s => s.Name.Contains(searchText, StringComparison.InvariantCultureIgnoreCase)).ToList();
-        }
-
         await SaveFilterState();
+        await SetBackground();
+        areaListComponent?.FilterAreas(isFilteredByBiome, selectedBiome, selectedLandscape, searchText);
     }
 
     private async Task FilterByBiome(bool isBiome)
     {
         isFilteredByBiome = isBiome;
-        await SetBackground();
-        await FilterSnas();
+        await FilterAreas();
     }
 
     private async Task OnSearchInput(object searchInput)
     {
         searchText = searchInput as string ?? string.Empty;
-        await FilterSnas();
+        await FilterAreas();
     }
 
-    private async Task OnSelectorClick(string selector = "All")
+    public async Task HandleBiomeChanged((string, string) selector)
     {
-        if (isFilteredByBiome)
-        {
-            selectedBiome = selector;
-        }
-        else
-        {
-            selectedLandscape = selector;
-        }
-        await SetBackground();
-        await FilterSnas();
+        selectedBiome = selector.Item1;
+        biomeBackgroundUrl = selector.Item2;
+        await FilterAreas();
     }
 
-    private string IsSelected(string item)
+    public async Task HandleLandscapeChanged((string, string) selector)
     {
-        if (isFilteredByBiome)
-        {
-            if (selectedBiome == item) return "item-selected";
-        }
-        else
-        {
-            if (selectedLandscape == item) return "item-selected";
-        }
-        return string.Empty;
+        selectedLandscape = selector.Item1;
+        landscapeBackgroundUrl = selector.Item2;
+        await FilterAreas();
     }
 
-    private async Task SetBackground(bool force = false)
+    private async Task SetBackground()
     {
-        string? backgroundUrl;
-        if (isFilteredByBiome)
-        {
-            backgroundUrl = biomes.Where(b => b.Name == selectedBiome).FirstOrDefault()?.Url;
-        }
-        else
-        {
-            backgroundUrl = biomes.Where(b => b.Landscapes.Contains(selectedLandscape)).FirstOrDefault()?.Url;
-        }
-
-        if (string.IsNullOrWhiteSpace(backgroundUrl))
-        {
-            backgroundUrl = "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg";
-        }
-
-        if ((selectedBackgroundUrl != backgroundUrl) || force)
+        string backgroundUrl = isFilteredByBiome ? biomeBackgroundUrl : landscapeBackgroundUrl;
+        if ((selectedBackgroundUrl != backgroundUrl))
         {
             await JS.InvokeVoidAsync("setBackgroundUrl", backgroundUrl);
             selectedBackgroundUrl = backgroundUrl;
@@ -228,21 +146,5 @@
             css = "filter-selected";
         }
         return css;
-    }
-
-    private string BiomeFilterListClass(bool isBiome)
-    {
-        string css = string.Empty;
-        if (isBiome != isFilteredByBiome)
-        {
-            css = "list-hidden";
-        }
-        return css;
-    }
-
-
-    private void OpenDetails(SNAModel sna)
-    {
-        navManager.NavigateTo($"/Details/{sna.Id}");
     }
 }

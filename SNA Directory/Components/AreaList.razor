@@ -1,0 +1,56 @@
+﻿@using System.Diagnostics
+@inject IAreaData areaData
+@inject NavigationManager navManager
+
+
+<div class=sna-entry>
+    @if (areas is not null)
+    {
+        <Virtualize Items="@areas" Context="s" OverscanCount="8">
+            <div class="selection-list-item text-nowrap" @onclick="(()=>OpenDetails(s))">@s.Name</div>
+        </Virtualize>
+    }
+</div>
+
+@code {
+    private List<AreaModel> allAreas = new();
+    private List<AreaModel> areas = new();
+
+    protected async override Task OnInitializedAsync()
+    {
+        allAreas = await areaData.GetAllAreasAsync();
+        if (allAreas is null) navManager.NavigateTo("/NoDatabase");
+    }
+
+    public void FilterAreas(bool IsBiome, string Biome, string Landscape, string SearchText)
+    {
+        areas = allAreas;
+
+        if (IsBiome)
+        {
+            if (Biome != "All")
+            {
+                areas = areas.Where(s => s.Biome == Biome).ToList();
+            }
+        }
+        else
+        {
+            if (Landscape != "All")
+            {
+                areas = areas.Where(s => s.Landscape == Landscape).ToList();
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(SearchText) == false)
+        {
+            areas = areas.Where(s => s.Name.Contains(SearchText, StringComparison.InvariantCultureIgnoreCase)).ToList();
+        }
+
+        StateHasChanged();
+    }
+
+    private void OpenDetails(AreaModel sna)
+    {
+        navManager.NavigateTo($"/Details/{sna.Id}");
+    }
+}

@@ -10,6 +10,8 @@ public static class RegisterServices
         builder.Services.AddMemoryCache(); 
 
         builder.Services.AddSingleton<IDbConnection,DbConnection>();
-        builder.Services.AddSingleton<ISNAData, SNAData>();
+        builder.Services.AddSingleton<IAreaData,AreaData>();
+        builder.Services.AddSingleton<IBiomeData, BiomeData>();
+        builder.Services.AddSingleton<ICommentData, CommentData>();
     }
 }

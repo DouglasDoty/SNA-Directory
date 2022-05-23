@@ -3,7 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace SNA_Directory.Data.Models;
 
-public class SNAModel
+public class AreaModel
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]

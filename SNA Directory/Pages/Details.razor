@@ -1,6 +1,7 @@
 ﻿@page "/Details/{Id}"
 @using System.Diagnostics
-@inject ISNAData snaData
+@inject IAreaData areaData
+@inject ICommentData commentData
 @inject IJSRuntime JS
 @inject NavigationManager navManager
 <div class="d-flex justify-content-end">
@@ -8,21 +9,21 @@
 </div>
 
 
-@if (_sna is not null)
+@if (_area is not null)
 {
     <div>
         <div class="row p-2">
             <div class="col-1">
                 <img src="@GetSNAMap()" height="55">
             </div>
-            <h2 class="col-11 col-md-8">SNA Name: @_sna.Name</h2>
+            <h2 class="col-11 col-md-8">SNA Name: @_area.Name</h2>
 
 
 
         </div>
-        <div>Biome(Province): @_sna.Biome</div>
+        <div>Biome(Province): @_area.Biome</div>
 
-        <div>Landscape: @_sna.Landscape</div>
+        <div>Landscape: @_area.Landscape</div>
         <div class="row image-buttons">
         </div>
         <div class="row">
@@ -80,7 +81,7 @@
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" @onclick="(()=>RefocusCommentText())" data-bs-dismiss="modal">Edit More</button>
                                         <button type="button" class="btn btn-secondary" @onclick="(()=>NewModel())" data-bs-dismiss="modal">Discard Comment</button>
-                                        <button type="submit" class="btn btn-primary" data-bs-dismiss="@CanCloseModal()">Save Comment</button>
+                                        <button type="submit" class="btn btn-primary">Save Comment</button>
                                     </div>
                                 </div>
                             </div>
@@ -116,7 +117,7 @@
     [Parameter]
     public string Id { get; set; } = string.Empty;
 
-    private SNAModel _sna = new(){DNRId = 0};
+    private AreaModel _area = new(){DNRId = 0};
     private List<CommentModel>? _comments;
     private CommentModel commentModel = new();
     private InputTextArea? commentText;
@@ -128,8 +129,8 @@
     {
         editContext = new(commentModel);
         _commentTextIdentifier = new(commentModel, "Text");
-        _sna = await snaData.GetSnaAsync(Id);
-        _comments = await snaData.GetComments(_sna.DNRId);
+        _area = await areaData.GetAreaAsync(Id);
+        _comments = await commentData.GetComments(_area.DNRId);
     }
     protected async override Task OnAfterRenderAsync(bool firstRender)
     {
@@ -142,23 +143,23 @@
 
     private string GetSNAMap()
     {
-        var result = $"https://maps1.dnr.state.mn.us/cgi-bin/locator.cgi?id=sna{_sna.DNRId.ToString("00000")}&type=sna&style=wolf";
+        var result = $"https://maps1.dnr.state.mn.us/cgi-bin/locator.cgi?id=sna{_area.DNRId.ToString("00000")}&type=sna&style=wolf";
         return result;
     }
 
     private string GetSNABanner()
     {
-        return $"https://images.dnr.state.mn.us/destinations/snas/slides/banners/sna{_sna.DNRId.ToString("00000")}_banner.jpg";
+        return $"https://images.dnr.state.mn.us/destinations/snas/slides/banners/sna{_area.DNRId.ToString("00000")}_banner.jpg";
     }
 
     private string GetSnaImage(int i = 1)
     {
-        return $"https://images.dnr.state.mn.us/destinations/snas/slides/sna{_sna.DNRId.ToString("00000")}_{i.ToString("0")}.jpg";
+        return $"https://images.dnr.state.mn.us/destinations/snas/slides/sna{_area.DNRId.ToString("00000")}_{i.ToString("0")}.jpg";
     }
 
     private void NewComment()
     {
-        navManager.NavigateTo($"./comment/{_sna.DNRId.ToString()}");
+        navManager.NavigateTo($"./comment/{_area.DNRId.ToString()}");
     }
 
     private async Task PopSaveDialog()
@@ -205,26 +206,16 @@
 
     private async Task HandleValidSubmit()
     {
-        commentModel.DnrId = _sna.DNRId;
+        commentModel.DnrId = _area.DNRId;
         commentModel.Date = DateTime.UtcNow;
-        await snaData.CreateComment(commentModel);
-        _comments = await snaData.GetComments(_sna.DNRId);
+        await commentData.CreateComment(commentModel);
+        _comments = await commentData.GetComments(_area.DNRId);
 
         await JS.InvokeVoidAsync("closeModal", "saveCommentModal");
         NewModel();
     }
 
-    private string CanCloseModal()
-    {
-        ////Validation happens too late to use attributes to close the modal
-        //if(editContext?.GetValidationMessages().Count() == 0)
-        //{
-        //    return "modal";
-        //}
-        return string.Empty;
-    }
-
-    private async void ClosePage()
+     private async void ClosePage()
     {
         await JS.InvokeVoidAsync("setBackgroundUrl", "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg");
         navManager.NavigateTo("/");
