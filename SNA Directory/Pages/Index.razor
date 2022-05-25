@@ -1,6 +1,5 @@
 ﻿@page "/"
 @using SNA_Directory.Components
-@using System.Diagnostics
 @inject ProtectedSessionStorage sessionStorage
 @inject IJSRuntime JS
 
@@ -84,7 +83,6 @@
         biomeBackgroundUrl = (stringResults.Success ? stringResults.Value : _defaultBackground) ?? _defaultBackground;
         stringResults = await sessionStorage.GetAsync<string>(nameof(landscapeBackgroundUrl));
         landscapeBackgroundUrl = (stringResults.Success ? stringResults.Value : _defaultBackground) ?? _defaultBackground;
-        Debug.WriteLine($"Filter loaded: isBiome={isFilteredByBiome}, Biome={selectedBiome}, Landscape={selectedLandscape}, SearchText=[{searchText}]");
     }
 
     private async Task SaveFilterState()

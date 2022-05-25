@@ -1,7 +1,6 @@
 ﻿@page "/Details/{Id}"
-@using System.Diagnostics
+@using SNA_Directory.Components
 @inject IAreaData areaData
-@inject ICommentData commentData
 @inject IJSRuntime JS
 @inject NavigationManager navManager
 <div class="d-flex justify-content-end">
@@ -17,96 +16,21 @@
                 <img src="@GetSNAMap()" height="55">
             </div>
             <h2 class="col-11 col-md-8">SNA Name: @_area.Name</h2>
-
-
-
         </div>
         <div>Biome(Province): @_area.Biome</div>
-
         <div>Landscape: @_area.Landscape</div>
         <div class="row image-buttons">
         </div>
         <div class="row">
-            <div id="carouselControl" class="carousel slide col-8 p-0" data-bs-ride="carousel">
-                <div class="carousel-inner">
-                    <div class="carousel-item active">
-                        <img src="@GetSNABanner()" class="d-block w-100" alt="...">
-                    </div>
-                    @for (int i = 1; i < 6; i++)
-                    {
-                        <div class="carousel-item">
-                            <img src="@GetSnaImage(i)" class="d-block w-100" alt="...">
-                        </div>
-
-                    }
-                </div>
-                <button class="carousel-control-prev" type="button" data-bs-target="#carouselControl" data-bs-slide="prev">
-                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                    <span class="visually-hidden">Previous</span>
-                </button>
-                <button class="carousel-control-next" type="button" data-bs-target="#carouselControl" data-bs-slide="next">
-                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                    <span class="visually-hidden">Next</span>
-                </button>
-
-            </div>
+            <div class="col-8">
+                <SNAImageCarousel Area="@_area"/>
+             </div>
 
             <div class="col-4">
                 <div class=" new-comment p-0 mx-2">
-                    <EditForm EditContext="@editContext" OnValidSubmit="@HandleValidSubmit">
-                        <DataAnnotationsValidator />
-                        <InputTextArea placeholder="Add a comment"
-                                   class="form-control new-comment-text"
-                                   @ref="commentText"
-                                   @onkeypress="((el)=>OnKeyPress(el))"
-                                   @onfocusout="((el)=>OnLoseFocus(el))"
-                                   @bind-Value="commentModel.Text">
-                        </InputTextArea>
-                        <!-- Modal -->
-                    <div class="modal fade" id="saveCommentModal" tabindex="-1" aria-labelledby="saveCommentModalLabel" aria-hidden="true">
-                            <div class="modal-dialog" @onfocusin="(()=>OnModalFocus())">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="saveCommentModalLabel">Save Comment?</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" @onclick="(()=>NewModel())" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <ValidationSummary />
-                                        <div class="name-section mb-4">
-                                            <label class="form-label " for="name">Your name</label>
-                                            <InputText class="form-control" id="name" @bind-Value="commentModel.Name" />
-                                        </div>
-
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" @onclick="(()=>RefocusCommentText())" data-bs-dismiss="modal">Edit More</button>
-                                        <button type="button" class="btn btn-secondary" @onclick="(()=>NewModel())" data-bs-dismiss="modal">Discard Comment</button>
-                                        <button type="submit" class="btn btn-primary">Save Comment</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </EditForm>
+                    <CommentEditor Area="@_area" CommentCompleted="@HandleCommentCompleted" />
                 </div>
-                @if (_comments?.Count > 0)
-                {
-                    @foreach (CommentModel comment in _comments)
-                    {
-                        <div class="sna-comment p-2 m-2">
-                            <span>
-                                @comment.Name
-                            </span>
-                            <span>said at</span>
-                            <span>
-                                @comment.Date.ToLocalTime().ToString("HH:mm on MMM dd yyy"):
-                            </span>
-                            <div class="comment-body">
-                                @comment.Text
-                            </div>
-                        </div>
-                    }
-                }
+                <CommentList @ref="TheCommentList" Area="@_area" />
             </div>
         </div>
 
@@ -117,21 +41,14 @@
     [Parameter]
     public string Id { get; set; } = string.Empty;
 
-    private AreaModel _area = new(){DNRId = 0};
-    private List<CommentModel>? _comments;
-    private CommentModel commentModel = new();
-    private InputTextArea? commentText;
-    private EditContext? editContext;
-    private FieldIdentifier _commentTextIdentifier;
-    private bool _popingModal = false;
+    private AreaModel _area = new() { DNRId = 0 };
+    private CommentList? TheCommentList { get; set; }
 
     protected async override Task OnInitializedAsync()
     {
-        editContext = new(commentModel);
-        _commentTextIdentifier = new(commentModel, "Text");
         _area = await areaData.GetAreaAsync(Id);
-        _comments = await commentData.GetComments(_area.DNRId);
     }
+
     protected async override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -140,84 +57,22 @@
         }
     }
 
-
     private string GetSNAMap()
     {
         var result = $"https://maps1.dnr.state.mn.us/cgi-bin/locator.cgi?id=sna{_area.DNRId.ToString("00000")}&type=sna&style=wolf";
         return result;
     }
 
-    private string GetSNABanner()
+    private async Task HandleCommentCompleted(CommentModel comment)
     {
-        return $"https://images.dnr.state.mn.us/destinations/snas/slides/banners/sna{_area.DNRId.ToString("00000")}_banner.jpg";
-    }
-
-    private string GetSnaImage(int i = 1)
-    {
-        return $"https://images.dnr.state.mn.us/destinations/snas/slides/sna{_area.DNRId.ToString("00000")}_{i.ToString("0")}.jpg";
-    }
-
-    private void NewComment()
-    {
-        navManager.NavigateTo($"./comment/{_area.DNRId.ToString()}");
-    }
-
-    private async Task PopSaveDialog()
-    {
-        _popingModal = true;
-        await JS.InvokeVoidAsync("popModal", "saveCommentModal");
-    }
-
-    private void OnModalFocus()
-    {
-        _popingModal = false;
-    }
-
-    private async Task OnLoseFocus(object el)
-    {
-        if ((!_popingModal) && (editContext?.IsModified() ?? false))
+        if (TheCommentList is not null)
         {
-            await PopSaveDialog();
+            await TheCommentList.SaveNewComment(comment);
         }
     }
 
-    private async void OnKeyPress(KeyboardEventArgs el)
+    private void ClosePage()
     {
-        if (el.Key == "Enter")
-        {
-            await PopSaveDialog();
-        }
-    }
-
-    private async Task RefocusCommentText()
-    {
-        if (commentText?.Element is not null)
-        {
-            await commentText.Element.Value.FocusAsync();
-        }
-    }
-
-    private void NewModel()
-    {
-        commentModel = new();
-        editContext = new(commentModel);
-        StateHasChanged();
-    }
-
-    private async Task HandleValidSubmit()
-    {
-        commentModel.DnrId = _area.DNRId;
-        commentModel.Date = DateTime.UtcNow;
-        await commentData.CreateComment(commentModel);
-        _comments = await commentData.GetComments(_area.DNRId);
-
-        await JS.InvokeVoidAsync("closeModal", "saveCommentModal");
-        NewModel();
-    }
-
-     private async void ClosePage()
-    {
-        await JS.InvokeVoidAsync("setBackgroundUrl", "https://images.dnr.state.mn.us/destinations/snas/banner_snas_main.jpg");
         navManager.NavigateTo("/");
     }
 }

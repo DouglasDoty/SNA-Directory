@@ -1,15 +1,14 @@
 ﻿@inject IBiomeData biomeData
 
-
 <div>
     <div class="@BiomeFilterListClass(true)">
         @if (biomes is not null)
         {
             <h3>Biome</h3>
-            <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
+            <div class="selection-list-item @IsBiomeSelected("All")" @onclick="(()=> OnBiomeClick() )">All</div>
             @foreach (var b in biomes)
             {
-                <div class="selection-list-item @IsSelected(b.Name)" @onclick="(()=>OnSelectorClick(b.Name))">@b.Name</div>
+                <div class="selection-list-item @IsBiomeSelected(b.Name)" @onclick="(()=>OnBiomeClick(b.Name))">@b.Name</div>
             }
         }
     </div>
@@ -17,10 +16,10 @@
         @if (landscapes is not null)
         {
             <h3>Landscape</h3>
-            <div class="selection-list-item @IsSelected("All")" @onclick="(()=> OnSelectorClick() )">All</div>
+            <div class="selection-list-item @IsLandscapeSelected("All")" @onclick="(()=> OnLandscapeClick() )">All</div>
             @foreach (var l in landscapes)
             {
-                <div class="selection-list-item @IsSelected(l)" @onclick="(()=>OnSelectorClick(l))">@l</div>
+                <div class="selection-list-item @IsLandscapeSelected(l)" @onclick="(()=>OnLandscapeClick(l))">@l</div>
             }
         }
     </div>
@@ -33,11 +32,11 @@
     [Parameter]
     public string SelectedBiome { get; set; } = "All";
     [Parameter]
-    public EventCallback<(string,string)> SelectedBiomeChanged { get; set; }
+    public EventCallback<(string, string)> SelectedBiomeChanged { get; set; }
     [Parameter]
     public string SelectedLandscape { get; set; } = "All";
     [Parameter]
-    public EventCallback<(string,string)> SelectedLandscapeChanged { get; set; }
+    public EventCallback<(string, string)> SelectedLandscapeChanged { get; set; }
 
     private List<Biome> biomes = new();
     private List<string> landscapes = new();
@@ -49,31 +48,26 @@
         landscapes = biomes.SelectMany(biome => biome.Landscapes).OrderBy(s => s).ToList();
     }
 
-     private string IsSelected(string item)
+    private string IsBiomeSelected(string item)
     {
-        if (isFilteredByBiome)
-        {
-            if (SelectedBiome == item) return "item-selected";
-        }
-        else
-        {
-            if (SelectedLandscape == item) return "item-selected";
-        }
-        return string.Empty;
+        return SelectedBiome == item ? "item-selected" : string.Empty;
     }
 
-    private async Task OnSelectorClick(string selector = "All")
+    private string IsLandscapeSelected(string item)
     {
-        if (isFilteredByBiome)
-        {
-            SelectedBiome = selector;
-            await SelectedBiomeChanged.InvokeAsync((selector,biomes.Where(b => b.Name == SelectedBiome).FirstOrDefault()?.Url ?? _defaultBackground));
-        }
-        else
-        {
-            SelectedLandscape = selector;
-            await SelectedLandscapeChanged.InvokeAsync(( selector, biomes.Where(b => b.Landscapes.Contains(SelectedLandscape)).FirstOrDefault()?.Url ?? _defaultBackground));
-        }
+        return SelectedLandscape == item ? "item-selected" : string.Empty;
+    }
+
+    private async Task OnBiomeClick(string selector = "All")
+    {
+        SelectedBiome = selector;
+        await SelectedBiomeChanged.InvokeAsync((selector, biomes.Where(b => b.Name == SelectedBiome).FirstOrDefault()?.Url ?? _defaultBackground));
+    }
+
+    private async Task OnLandscapeClick(string selector = "All")
+    {
+        SelectedLandscape = selector;
+        await SelectedLandscapeChanged.InvokeAsync((selector, biomes.Where(b => b.Landscapes.Contains(SelectedLandscape)).FirstOrDefault()?.Url ?? _defaultBackground));
     }
 
     private string BiomeFilterListClass(bool isBiome)

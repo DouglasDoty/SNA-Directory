@@ -1,0 +1,46 @@
+﻿@inject ICommentData commentData
+
+@if (_comments?.Count > 0)
+{
+    @foreach (CommentModel comment in _comments)
+    {
+        <div class="sna-comment p-2 m-2">
+            <span>
+                @comment.Name
+            </span>
+            <span>said at</span>
+            <span>
+                @comment.Date.ToLocalTime().ToString("HH:mm on MMM dd yyy"):
+            </span>
+            <div class="comment-body">
+                @comment.Text
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public AreaModel? Area { get; set; }
+    private List<CommentModel> _comments = new();
+
+    protected async override Task OnParametersSetAsync()
+    {
+        await GetComments();
+    }
+
+    public async Task SaveNewComment(CommentModel commentModel)
+    {
+        await commentData.CreateComment(commentModel);
+        await GetComments();
+    }
+
+    private async Task GetComments()
+    {
+       if (Area is not null && Area.DNRId > 0)
+        {
+            _comments = await commentData.GetComments(Area.DNRId);
+        }
+    }
+
+}
